@@ -1,0 +1,48 @@
+# VS Code
+.vscode/
+*.code-workspace
+
+# C/C++ build artifacts
+*.o
+*.a
+*.so
+*.exe
+*.out
+*.obj
+*.pdb
+*.ilk
+*.dll
+*.lib
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+*~
+
+# Build directories
+build/
+bin/
+obj/
+
+# Dependency directories
+deps/
+vendor/
+
+# macOS
+.DS_Store
+
+# Linux
+*.i
+*.s
+
+# Logs
+*.log
+logs/
+
+# Other
+*.cache
+*.diff
+*.patch
+*.md5
+*.sha1
