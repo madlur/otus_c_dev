@@ -1,143 +1,153 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <curl/curl.h>
+#include "cJSON.h"
 
-static const unsigned short cp1251_to_unicode[128] = {
-    0x0402, 0x0403, 0x201A, 0x0453, 0x201E, 0x2026, 0x2020, 0x2021,
-    0x20AC, 0x2030, 0x0409, 0x2039, 0x040A, 0x040C, 0x040B, 0x040F,
-    0x0452, 0x2018, 0x2019, 0x201C, 0x201D, 0x2022, 0x2013, 0x2014,
-    0x00A0, 0x2122, 0x0459, 0x203A, 0x045A, 0x045C, 0x045B, 0x045F,
-    0x00A0, 0x040E, 0x045E, 0x0408, 0x00A4, 0x0490, 0x00A6, 0x00A7,
-    0x0401, 0x00A9, 0x0404, 0x00AB, 0x00AC, 0x00AD, 0x00AE, 0x0407,
-    0x00B0, 0x00B1, 0x0406, 0x0456, 0x0491, 0x00B5, 0x00B6, 0x00B7,
-    0x0451, 0x2116, 0x0454, 0x00BB, 0x0458, 0x0405, 0x0455, 0x0457,
-    0x0410, 0x0411, 0x0412, 0x0413, 0x0414, 0x0415, 0x0416, 0x0417,
-    0x0418, 0x0419, 0x041A, 0x041B, 0x041C, 0x041D, 0x041E, 0x041F,
-    0x0420, 0x0421, 0x0422, 0x0423, 0x0424, 0x0425, 0x0426, 0x0427,
-    0x0428, 0x0429, 0x042A, 0x042B, 0x042C, 0x042D, 0x042E, 0x042F,
-    0x0430, 0x0431, 0x0432, 0x0433, 0x0434, 0x0435, 0x0436, 0x0437,
-    0x0438, 0x0439, 0x043A, 0x043B, 0x043C, 0x043D, 0x043E, 0x043F,
-    0x0440, 0x0441, 0x0442, 0x0443, 0x0444, 0x0445, 0x0446, 0x0447,
-    0x0448, 0x0449, 0x044A, 0x044B, 0x044C, 0x044D, 0x044E, 0x044F
+struct MemoryStruct {
+    char *memory;
+    size_t size;
 };
 
-static const unsigned short koi8r_to_unicode[128] = {
-    0x2500, 0x2502, 0x250C, 0x2510, 0x2514, 0x2518, 0x251C, 0x2524,
-    0x252C, 0x2534, 0x253C, 0x2580, 0x2584, 0x2588, 0x258C, 0x2590,
-    0x2591, 0x2592, 0x2593, 0x2320, 0x25A0, 0x2219, 0x221A, 0x2248,
-    0x2264, 0x2265, 0x00A0, 0x2321, 0x00B0, 0x00B2, 0x00B7, 0x00F7,
-    0x2550, 0x2551, 0x2552, 0x0451, 0x2553, 0x2554, 0x2555, 0x2556,
-    0x2557, 0x2558, 0x2559, 0x255A, 0x255B, 0x255C, 0x255D, 0x255E,
-    0x255F, 0x2560, 0x2561, 0x0401, 0x2562, 0x2563, 0x2564, 0x2565,
-    0x2566, 0x2567, 0x2568, 0x2569, 0x256A, 0x256B, 0x256C, 0x00A9,
-    0x044E, 0x0430, 0x0431, 0x0446, 0x0434, 0x0435, 0x0444, 0x0433,
-    0x0445, 0x0438, 0x0439, 0x043A, 0x043B, 0x043C, 0x043D, 0x043E,
-    0x043F, 0x044F, 0x0440, 0x0441, 0x0442, 0x0443, 0x0436, 0x0432,
-    0x044C, 0x044B, 0x0437, 0x0448, 0x044D, 0x0449, 0x0447, 0x044A,
-    0x042E, 0x0410, 0x0411, 0x0426, 0x0414, 0x0415, 0x0424, 0x0413,
-    0x0425, 0x0418, 0x0419, 0x041A, 0x041B, 0x041C, 0x041D, 0x041E,
-    0x041F, 0x042F, 0x0420, 0x0421, 0x0422, 0x0423, 0x0416, 0x0412,
-    0x042C, 0x042B, 0x0417, 0x0428, 0x042D, 0x0429, 0x0427, 0x042A
-};
+static size_t WriteMemoryCallback(void *contents, size_t size, size_t nmemb, void *userp) {
+    size_t realsize = size * nmemb;
+    struct MemoryStruct *mem = (struct MemoryStruct *)userp;
 
-static const unsigned short iso8859_5_to_unicode[128] = {
-    0x0080, 0x0081, 0x0082, 0x0083, 0x0084, 0x0085, 0x0086, 0x0087,
-    0x0088, 0x0089, 0x008A, 0x008B, 0x008C, 0x008D, 0x008E, 0x008F,
-    0x0090, 0x0091, 0x0092, 0x0093, 0x0094, 0x0095, 0x0096, 0x0097,
-    0x0098, 0x0099, 0x009A, 0x009B, 0x009C, 0x009D, 0x009E, 0x009F,
-    0x00A0, 0x0401, 0x0402, 0x0403, 0x0404, 0x0405, 0x0406, 0x0407,
-    0x0408, 0x0409, 0x040A, 0x040B, 0x040C, 0x00AD, 0x040E, 0x040F,
-    0x0410, 0x0411, 0x0412, 0x0413, 0x0414, 0x0415, 0x0416, 0x0417,
-    0x0418, 0x0419, 0x041A, 0x041B, 0x041C, 0x041D, 0x041E, 0x041F,
-    0x0420, 0x0421, 0x0422, 0x0423, 0x0424, 0x0425, 0x0426, 0x0427,
-    0x0428, 0x0429, 0x042A, 0x042B, 0x042C, 0x042D, 0x042E, 0x042F,
-    0x0430, 0x0431, 0x0432, 0x0433, 0x0434, 0x0435, 0x0436, 0x0437,
-    0x0438, 0x0439, 0x043A, 0x043B, 0x043C, 0x043D, 0x043E, 0x043F,
-    0x0440, 0x0441, 0x0442, 0x0443, 0x0444, 0x0445, 0x0446, 0x0447,
-    0x0448, 0x0449, 0x044A, 0x044B, 0x044C, 0x044D, 0x044E, 0x044F,
-    0x2116, 0x0451, 0x0452, 0x0453, 0x0454, 0x0455, 0x0456, 0x0457,
-    0x0458, 0x0459, 0x045A, 0x045B, 0x045C, 0x00A7, 0x045E, 0x045F
-};
-
-void write_utf8(FILE *out, unsigned int code) {
-    if (code <= 0x7F) {
-        fputc(code, out);
-    } else if (code <= 0x7FF) {
-        fputc(0xC0 | (code >> 6), out);
-        fputc(0x80 | (code & 0x3F), out);
-    } else {
-        fputc(0xE0 | (code >> 12), out);
-        fputc(0x80 | ((code >> 6) & 0x3F), out);
-        fputc(0x80 | (code & 0x3F), out);
+    char *ptr = realloc(mem->memory, mem->size + realsize + 1);
+    if (ptr == NULL) {
+        fprintf(stderr, "Ошибка выделения памяти\n");
+        return 0;
     }
+
+    mem->memory = ptr;
+    memcpy(&(mem->memory[mem->size]), contents, realsize);
+    mem->size += realsize;
+    mem->memory[mem->size] = 0;
+
+    return realsize;
 }
 
-int convert_file(const char *input_file, const char *output_file, const char *encoding) {
-    FILE *in = fopen(input_file, "rb");
-    if (!in) {
-        fprintf(stderr, "Error: Cannot open input file %s\n", input_file);
-        return 1;
-    }
+void get_weather(const char *location) {
+    CURL *curl;
+    CURLcode res;
+    struct MemoryStruct chunk;
+    long http_code = 0;
 
-    FILE *out = fopen(output_file, "wb");
-    if (!out) {
-        fprintf(stderr, "Error: Cannot open output file %s\n", output_file);
-        fclose(in);
-        return 1;
-    }
+    chunk.memory = malloc(1);
+    chunk.size = 0;
 
-    const unsigned short *table;
-    if (strcmp(encoding, "CP-1251") == 0) {
-        table = cp1251_to_unicode;
-    } else if (strcmp(encoding, "KOI8-R") == 0) {
-        table = koi8r_to_unicode;
-    } else if (strcmp(encoding, "ISO-8859-5") == 0) {
-        table = iso8859_5_to_unicode;
-    } else {
-        fprintf(stderr, "Error: Unsupported encoding %s\n", encoding);
-        fclose(in);
-        fclose(out);
-        return 1;
-    }
+    curl_global_init(CURL_GLOBAL_DEFAULT);
+    curl = curl_easy_init();
 
-    int c;
-    int byte_count = 0;
+    if (curl) {
+        char *escaped_location = curl_easy_escape(curl, location, 0);
+        if (!escaped_location) {
+            fprintf(stderr, "Ошибка кодирования URL\n");
+            goto cleanup;
+        }
+        
+        char url[256];
+        snprintf(url, sizeof(url), "https://wttr.in/%s?format=j1", escaped_location);
+        curl_free(escaped_location);
 
-    while ((c = fgetc(in)) != EOF) {
-        byte_count++;
-        if (c >= 0x80) {
-            unsigned short unicode = table[c - 128];
-            write_utf8(out, unicode);
+        curl_easy_setopt(curl, CURLOPT_URL, url);
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&chunk);
+        curl_easy_setopt(curl, CURLOPT_USERAGENT, "curl/7.68.0");
+        res = curl_easy_perform(curl);
+
+        if (res != CURLE_OK) {
+            fprintf(stderr, "Ошибка при запросе к API: %s\n", curl_easy_strerror(res));
+            goto cleanup;
+        }
+        
+        curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
+        if (http_code >= 400) {
+            if (http_code == 400) {
+                fprintf(stderr, "Ошибка 400: Неверный запрос\n");
+            } else if (http_code >= 500) {
+                fprintf(stderr, "Ошибка %ld: Проблема на сервере\n", http_code);
+            } else {
+                fprintf(stderr, "Ошибка HTTP: %ld\n", http_code);
+            }
+            goto cleanup;
+        }
+
+        cJSON *json = cJSON_Parse(chunk.memory);
+        if (json == NULL) {
+            const char *error_ptr = cJSON_GetErrorPtr();
+            if (error_ptr != NULL) {
+                fprintf(stderr, "Ошибка разбора JSON: %s\n", error_ptr);
+            }
         } else {
-            write_utf8(out, c);
+            cJSON *current_condition = cJSON_GetObjectItemCaseSensitive(json, "current_condition");
+            if (current_condition != NULL && cJSON_IsArray(current_condition)) {
+                cJSON *condition = cJSON_GetArrayItem(current_condition, 0);
+                if (condition != NULL) {
+                    cJSON *weather_desc = cJSON_GetObjectItemCaseSensitive(condition, "weatherDesc");
+                    if (weather_desc != NULL && cJSON_IsArray(weather_desc)) {
+                        cJSON *desc_item = cJSON_GetArrayItem(weather_desc, 0);
+                        if (desc_item != NULL) {
+                            cJSON *value = cJSON_GetObjectItemCaseSensitive(desc_item, "value");
+                            if (cJSON_IsString(value)) {
+                                printf("Погода: %s\n", value->valuestring);
+                            }
+                        }
+                    }
+
+                    cJSON *windspeed = cJSON_GetObjectItemCaseSensitive(condition, "windspeedKmph");
+                    cJSON *winddir = cJSON_GetObjectItemCaseSensitive(condition, "winddir16Point");
+                    if (cJSON_IsString(winddir) && cJSON_IsString(windspeed)) {
+                        printf("Ветер: %s, %s км/ч\n", winddir->valuestring, windspeed->valuestring);
+                    }
+
+                    cJSON *temp_C = cJSON_GetObjectItemCaseSensitive(condition, "temp_C");
+                    if (cJSON_IsString(temp_C)) {
+                        printf("Температура: %s°C\n", temp_C->valuestring);
+                    }
+                }
+            } else {
+                fprintf(stderr, "Не удалось получить данные о погоде\n");
+            }
+
+            cJSON *weather = cJSON_GetObjectItemCaseSensitive(json, "weather");
+            if (weather != NULL && cJSON_IsArray(weather)) {
+                cJSON *today = cJSON_GetArrayItem(weather, 0);
+                if (today != NULL) {
+                    cJSON *maxtempC = cJSON_GetObjectItemCaseSensitive(today, "maxtempC");
+                    cJSON *mintempC = cJSON_GetObjectItemCaseSensitive(today, "mintempC");
+                    if (cJSON_IsString(maxtempC) && cJSON_IsString(mintempC)) {
+                        printf("Диапазон температур: %s°C ... %s°C\n", mintempC->valuestring, maxtempC->valuestring);
+                    }
+                }
+            }
+
+            cJSON_Delete(json);
         }
     }
 
-    if (ferror(in)) {
-        fprintf(stderr, "Error: Reading input file %s\n", input_file);
-        fclose(in);
-        fclose(out);
-        return 1;
-    }
-
-    fprintf(stderr, "Processed %d bytes\n", byte_count);
-    fclose(in);
-    fclose(out);
-    return 0;
+cleanup:
+    if (curl) curl_easy_cleanup(curl);
+    free(chunk.memory);
+    curl_global_cleanup();
 }
 
-int main(int argc, char** argv)
-{
-    if (argc != 4) {
-        fprintf(stderr, "Usage: %s <input_file> <encoding> <output_file>\n", argv[0]);
-        fprintf(stderr, "Supported encodings: CP-1251, KOI8-R, ISO-8859-5\n");
-        return EXIT_FAILURE;;
+int main(int argc, char *argv[]) {
+    if (argc < 2) {
+        fprintf(stderr, "Использование: %s <город>\n", argv[0]);
+        return EXIT_FAILURE;
     }
 
-    if (convert_file(argv[1], argv[3], argv[2]) != 0) {
-        return EXIT_SUCCESS;
+    if (argc > 2) {
+        char location[256] = "";
+        for (int i = 1; i < argc; i++) {
+            strcat(location, argv[i]);
+            if (i < argc - 1) strcat(location, " ");
+        }
+        get_weather(location);
+    } else {
+        get_weather(argv[1]);
     }
-
-    return 0;
+    
+    return EXIT_SUCCESS;
 }
-
